@@ -6,6 +6,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.ViewModelProvider
 import com.example.love_calculator.R
 import com.example.love_calculator.data.model.LoveModel
 import com.example.love_calculator.data.retrofit.RetrofitService
@@ -18,49 +19,42 @@ import retrofit2.Response
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val viewModel: MainViewModel by lazy {
+        ViewModelProvider(this)[MainViewModel::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-        binding.btnCalculate.setOnClickListener {
-            val firstName = binding.etFname.text.toString()
-            val secondName = binding.etSname.text.toString()
+        initClickers()
+    }
 
-            if (firstName.isNotEmpty() && secondName.isNotEmpty()) {
-                initClickers(firstName, secondName)
+    private fun initClickers() = with(binding) {
+        btnCalculate.setOnClickListener {
+            viewModel.getLovePercentage(
+                firstName = etFname.text.toString(),
+                secondName = etSname.text.toString()
+            ).observe(this@MainActivity) { data ->
+                setupObservers(data)
             }
         }
     }
-    private fun initClickers(firstName: String, secondName: String) {
-        val loveApi = RetrofitService().api
 
-        loveApi.getPercentage(Constants.API_KEY,Constants.HOST,firstName,secondName).enqueue(object :
-            Callback<LoveModel> {
-            override fun onResponse(call: Call<LoveModel>, response: Response<LoveModel>) {
-                if (response.isSuccessful){
-                    val loveModel = response.body()
-                    val intent = Intent(this@MainActivity, SecondActivity::class.java)
-                    intent.putExtra(ARG_FIRST_NAME, firstName)
-                    intent.putExtra(ARG_SECOND_NAME, secondName)
-                    intent.putExtra(ARG_PERCENTAGE, loveModel?.percentage)
-                    intent.putExtra(ARG_RESULT, loveModel?.result)
-                    startActivity(intent)
-                }
-            }
+    private fun setupObservers(data: LoveModel) = with(viewModel) {
+        startActivity(
+            Intent(this@MainActivity, SecondActivity::class.java).apply {
+                putExtra(ARG_FIRST_NAME, binding.etFname.text.toString())
+                putExtra(ARG_SECOND_NAME, binding.etSname.text.toString())
+                putExtra(ARG_PERCENTAGE, data.percentage)
+                putExtra(ARG_RESULT, data.result)
+            })
+    }
 
-            override fun onFailure(call: Call<LoveModel>, t: Throwable) {
-            }
-        })
+    companion object {
+        const val ARG_FIRST_NAME = "firstName"
+        const val ARG_SECOND_NAME = "secondName"
+        const val ARG_PERCENTAGE = "percentage"
+        const val ARG_RESULT = "result"
     }
 }
-const val ARG_FIRST_NAME = "firstName"
-const val ARG_SECOND_NAME = "secondName"
-const val ARG_PERCENTAGE = "percentage"
-const val ARG_RESULT = "result"
